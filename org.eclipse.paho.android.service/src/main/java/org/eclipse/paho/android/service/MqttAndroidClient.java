@@ -108,11 +108,13 @@ public class MqttAndroidClient extends BroadcastReceiver implements
 
 		@Override
 		public void onServiceConnected(ComponentName name, IBinder binder) {
-			mqttService = ((MqttServiceBinder) binder).getService();
-			bindedService = true;
-			// now that we have the service available, we can actually
-			// connect...
-			doConnect();
+			if(binder instanceof MqttServiceBinder) {
+				mqttService = ((MqttServiceBinder) binder).getService();
+				bindedService = true;
+				// now that we have the service available, we can actually
+				// connect...
+				doConnect();
+			}
 		}
 
 		@Override
@@ -411,7 +413,13 @@ public class MqttAndroidClient extends BroadcastReceiver implements
 		if (mqttService == null) { // First time - must bind to the service
 			Intent serviceStartIntent = new Intent();
 			serviceStartIntent.setClassName(myContext, SERVICE_NAME);
-			Object service = myContext.startService(serviceStartIntent);
+			Object service = null;
+			try {
+				service = myContext.startService(serviceStartIntent);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+
 			if (service == null) {
 				IMqttActionListener listener = token.getActionCallback();
 				if (listener != null) {
@@ -432,10 +440,14 @@ public class MqttAndroidClient extends BroadcastReceiver implements
 
 				@Override
 				public void run() {
-					doConnect();
-					
-					//Register receiver to show shoulder tap.
-					if (!receiverRegistered) registerReceiver(MqttAndroidClient.this);
+					try {
+						doConnect();
+
+						//Register receiver to show shoulder tap.
+						if (!receiverRegistered) registerReceiver(MqttAndroidClient.this);
+					}catch (Exception e) {
+						e.printStackTrace();
+					}
 				}
 
 			});
@@ -468,6 +480,12 @@ public class MqttAndroidClient extends BroadcastReceiver implements
 					activityToken);
 		}
 		catch (MqttException e) {
+			IMqttActionListener listener = connectToken.getActionCallback();
+			if (listener != null) {
+				listener.onFailure(connectToken, e);
+			}
+		}
+		catch (Exception e) {
 			IMqttActionListener listener = connectToken.getActionCallback();
 			if (listener != null) {
 				listener.onFailure(connectToken, e);
@@ -1501,7 +1519,9 @@ public class MqttAndroidClient extends BroadcastReceiver implements
 				((MqttTokenAndroid) token).notifyFailure(exceptionThrown);
 			}
 		} else {
-			mqttService.traceError(MqttService.TAG, "simpleAction : token is null");	
+			try {
+				mqttService.traceError(MqttService.TAG, "simpleAction : token is null");
+			}catch (Exception e) {}
 		}
 	}
 
